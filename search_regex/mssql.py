@@ -7,6 +7,8 @@ class FindSP:
     FIND_END = re.compile(r'^AS|^BEGIN|^\)', re.IGNORECASE)
     CLEAR_TRASH = re.compile(r'[\[\]/\\*]')
     VARIABLE_START_WITH = '@'
+    DEL_COMMENTS = re.compile(r'(/\*.*\*/)|(--.*$)', re.DOTALL | re.MULTILINE)
+    DEFAULT = re.compile('')
 
 
 class GetAttrs:

@@ -6,12 +6,16 @@ from search_regex.mssql import FindSP, GetAttrs
 
 
 def find_base_text(string):
+    clear = lambda x: re.sub(FindSP.DEFAULT, "", x)
+
     if isinstance(string, str):
-        text_lines = string.split('\n')
+        string = clear(string)
     elif isinstance(string, TextIOWrapper):
-        text_lines = string.readlines()
+        string = clear(string.read())
     else:
         raise TypeError(f"Text {type(string)} should be type str or TextIOWrapper")
+
+    text_lines = string.split('\n')
 
     proc_start = False
     proc_text = ''
@@ -49,6 +53,8 @@ def get_attributes(sp_text):
                 type_index = 1
                 variable_name = variable[name_index]
                 variable_type = variable[type_index]
+                if not variable_name.startswith(FindSP.VARIABLE_START_WITH):
+                    continue
                 attrs['variables'][variable_name] = {'type': None, 'default': ''}
                 try:
                     first_part_type = 2
@@ -60,14 +66,16 @@ def get_attributes(sp_text):
                     else:
                         default = variable[default_value]
                 except IndexError:
-                    if '=' in variable_type:
-                        values = variable_type.split('=')
+                    default_value_identifier = '='
+                    if default_value_identifier in variable_type:
+                        values = variable_type.split(default_value_identifier)
                         variable_type = values[0]
                         default = values[1]
                     else:
                         default = ''
-                attrs['variables'][variable_name]['type'] = variable_type.strip(',')
-                attrs['variables'][variable_name]['default'] = default.strip(',')
+                clear = lambda x: x.strip(',').strip(';')
+                attrs['variables'][variable_name]['type'] = clear(variable_type)
+                attrs['variables'][variable_name]['default'] = clear(default)
 
         return attrs
 
@@ -109,14 +117,23 @@ string = [
     """ALTER PROCEDURE dbo.CourierTaskLstForDocumentsCourierRoutingSheet 
     @ID dbo.BIDENT"""
 ]
-for _ in string:
-    text = find_base_text(_)
-    pprint.pprint(get_attributes(_))
+# for _ in string:
+#     text = find_base_text(_)
+#     pprint.pprint(get_attributes(_))
 
-# for file in pathlib.Path('dbo').iterdir():
-#     with file.open(mode='r', errors='ignore', encoding='utf-8') as text:
-#         base_text = find_base_text(text)
-#         pprint.pprint(get_attributes(base_text))
+types = []
+for file in pathlib.Path('PVZ').iterdir():
+    with file.open(mode='r', errors='ignore', encoding='utf-8') as text:
+        base_text = find_base_text(text)
+        attrs = get_attributes(base_text)
+        if attrs:
+            for v in attrs['variables'].values():
+                if str(v['type']).startswith('@'):
+                    print(base_text)
+                    pprint.pprint(attrs)
+                types.append(re.sub(r'(\(.*\))|\)', '', v['type']))
+
+pprint.pprint(set(types))
 
 # with pathlib.Path('result.sql').open(mode='w', errors='ignore', encoding='utf-8') as res_file:
 #     res_file.writelines(result)
